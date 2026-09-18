@@ -1106,7 +1106,7 @@ _ROUTE_RULESETS='      { "type": "remote", "tag": "geoip-cn", "format": "binary"
       { "type": "remote", "tag": "geosite-geolocation-!cn", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs", "http_client": "全局HTTP客户端路由代理", "update_interval": "24h0m0s" },
       { "type": "remote", "tag": "geosite-category-ads-all", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs", "http_client": "全局HTTP客户端路由代理", "update_interval": "24h0m0s" },
       { "type": "remote", "tag": "megamori", "format": "binary", "url": "https://raw.githubusercontent.com/neomikanagi/megamori/main/megamori.srs", "http_client": "全局HTTP客户端路由代理", "update_interval": "24h0m0s" },
-      { "type": "remote", "tag": "geosite-openai", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs", "http_client": "全局HTTP客户端路由代理", "update_interval": "24h0m0s" },
+      { "type": "remote", "tag": "category-ai-!cn", "format": "binary", "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ai-!cn.srs", "http_client": "全局HTTP客户端路由代理", "update_interval": "24h0m0s" },
       { "type": "remote", "tag": "geosite-duolingo", "format": "binary", "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/duolingo.srs", "http_client": "全局HTTP客户端路由代理", "update_interval": "24h0m0s" }'
 
 # ── 1.11.4 专属 route rule_sets 配置块 ─────────────────────────────────────
@@ -1116,7 +1116,7 @@ _ROUTE_RULESETS_1114='      { "type": "remote", "tag": "geoip-cn", "format": "bi
       { "type": "remote", "tag": "geosite-geolocation-!cn", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-geolocation-!cn.srs", "download_detour": "代理_469138946ba5fa", "update_interval": "24h0m0s" },
       { "type": "remote", "tag": "geosite-category-ads-all", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ads-all.srs", "download_detour": "代理_469138946ba5fa", "update_interval": "24h0m0s" },
       { "type": "remote", "tag": "megamori", "format": "binary", "url": "https://raw.githubusercontent.com/neomikanagi/megamori/main/megamori.srs", "download_detour": "代理_469138946ba5fa", "update_interval": "24h0m0s" },
-      { "type": "remote", "tag": "geosite-openai", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-openai.srs", "download_detour": "代理_469138946ba5fa", "update_interval": "24h0m0s" },
+      { "type": "remote", "tag": "category-ai-!cn", "format": "binary", "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/category-ai-!cn.srs", "download_detour": "代理_469138946ba5fa", "update_interval": "24h0m0s" },
       { "type": "remote", "tag": "geosite-duolingo", "format": "binary", "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/duolingo.srs", "download_detour": "代理_469138946ba5fa", "update_interval": "24h0m0s" }'
 
 # ── 1.11.4 专属 DNS 配置块 ─────────────────────────────────────
@@ -1133,7 +1133,7 @@ _DNS_BLOCK_1114='    "servers": [
         "domain": [
           '"${_AD_DOMAINS}"'
         ], "server": "dns_block", "disable_cache": true },
-      { "rule_set": "geosite-openai", "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
+      { "rule_set": "category-ai-!cn", "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
       { "rule_set": [ "geosite-private", "geoip-cn" ], "server": "解析ALIDNS_469138946ba5fa" },
       { "rule_set": "geosite-geolocation-!cn", "server": "解析CLOUDFLAREDNS_469138946ba5fa" }
     ],
@@ -1627,7 +1627,7 @@ gen_client() {
       { \"domain\": [ ${_AD_DOMAINS} ], \"action\": \"predefined\", \"rcode\": \"NXDOMAIN\" },
       { \"rule_set\": [ \"geosite-private\", \"geosite-cn\" ], \"server\": \"解析ALIDNS_469138946ba5fa\" },
       { \"rule_set\": \"geosite-duolingo\", \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
-      { \"rule_set\": \"geosite-openai\", \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
+      { \"rule_set\": \"category-ai-!cn\", \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
       { \"rule_set\": \"geosite-geolocation-!cn\", \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
       { \"query_type\": [ \"A\", \"AAAA\" ], \"server\": \"解析FAKEIP_469138946ba5fa\" }
     ],
@@ -1701,7 +1701,7 @@ $(get_shared_outbounds)${_EXTRA_OBS}
       ${_PRIVATE_RULE}
       { "rule_set": "geosite-cn", "outbound": "直连_469138946ba5fa" },
       { "rule_set": "geoip-cn", "outbound": "直连_469138946ba5fa" },
-      { "rule_set": "geosite-openai", "outbound": "智能_469138946ba5fa" },
+      { "rule_set": "category-ai-!cn", "outbound": "智能_469138946ba5fa" },
       { "rule_set": "geosite-geolocation-!cn", "outbound": "代理_469138946ba5fa" }
     ],
     "rule_set": [
