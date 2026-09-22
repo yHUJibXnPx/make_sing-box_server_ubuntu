@@ -1050,7 +1050,7 @@ INSECURE_REALITY_LINK="0"
 INSECURE_HY2_TUIC_JSON="false"
 
 # TLS：需要 true / 1
-INSECURE_SELFSIGNED_JSON="true"
+INSECURE_SELFSIGNED_JSON="false"
 INSECURE_SELFSIGNED_LINK="1"
 
 # 正规证书 / Cloudflare 节点：必须为 false / 0
@@ -1207,7 +1207,7 @@ get_shared_outbounds() {
     { "type": "vless", "tag": "${OUTBOUND_VLESS}", "server": "${SERVER_IP}", "server_port": ${PORT_VLESS}, "uuid": "${UUID_VLESS}", "flow": "xtls-rprx-vision", "packet_encoding": "${PACKET_ENCODING}", "tls": { "enabled": true, "server_name": "${BEST_DOMAIN}", "insecure": ${INSECURE_REALITY_JSON}, "utls": { "enabled": true, "fingerprint": "${FINGERPRINT_TYPE}" }, "reality": { "enabled": true, "public_key": "${PUBLIC_KEY}", "short_id": "${SHORT_ID_VLESS}" } } },
     { "type": "trojan", "tag": "${OUTBOUND_TROJAN}", "server": "${SERVER_IP}", "server_port": ${PORT_TROJAN}, "password": "${PASSWORD_TROJAN}", "tls": { "enabled": true, "server_name": "${BEST_DOMAIN}", "insecure": ${INSECURE_REALITY_JSON}, "utls": { "enabled": true, "fingerprint": "${FINGERPRINT_TYPE}" }, "reality": { "enabled": true, "public_key": "${PUBLIC_KEY}", "short_id": "${SHORT_ID_TROJAN}" } } },
     { "type": "vmess", "tag": "${OUTBOUND_VMESS_REALITY}", "server": "${SERVER_IP}", "server_port": ${PORT_VMESS_REALITY}, "uuid": "${UUID_VMESS_REALITY}", "security": "auto", "packet_encoding": "${PACKET_ENCODING}", "tls": { "enabled": true, "server_name": "${BEST_DOMAIN}", "insecure": ${INSECURE_REALITY_JSON}, "utls": { "enabled": true, "fingerprint": "${FINGERPRINT_TYPE}" }, "reality": { "enabled": true, "public_key": "${PUBLIC_KEY}", "short_id": "${SHORT_ID_VMESS_REALITY}" } } },
-    { "type": "vmess", "tag": "${OUTBOUND_VMESS_WS_TLS}", "server": "${SERVER_IP}", "server_port": ${PORT_VMESS_WS_TLS}, "uuid": "${UUID_VMESS_WS_TLS}", "security": "auto", "packet_encoding": "${PACKET_ENCODING}", "tls": { "enabled": true, "server_name": "${BEST_DOMAIN}", "insecure": ${INSECURE_SELFSIGNED_JSON}, "alpn": [${ALPN_WS_JSON}] }, "transport": { "type": "ws", "path": "/${PATH_VMESS_WS_TLS}", "headers": { "Host": "${BEST_DOMAIN}" }, "early_data_header_name": "Sec-WebSocket-Protocol" } },
+    { "type": "vmess", "tag": "${OUTBOUND_VMESS_WS_TLS}", "server": "${SERVER_IP}", "server_port": ${PORT_VMESS_WS_TLS}, "uuid": "${UUID_VMESS_WS_TLS}", "security": "auto", "packet_encoding": "${PACKET_ENCODING}", "tls": { "enabled": true, "server_name": "${BEST_DOMAIN}", "insecure": ${INSECURE_SELFSIGNED_JSON}, "alpn": [${ALPN_WS_JSON}], "certificate": $CERT }, "transport": { "type": "ws", "path": "/${PATH_VMESS_WS_TLS}", "headers": { "Host": "${BEST_DOMAIN}" }, "early_data_header_name": "Sec-WebSocket-Protocol" } },
     { "type": "vless", "tag": "${OUTBOUND_VLESS_WS}", "server": "${SERVER_IP}", "server_port": ${PORT_VLESS_WS}, "uuid": "${UUID_VLESS_WS}", "packet_encoding": "${PACKET_ENCODING}", "transport": { "type": "ws", "path": "/${PATH_VLESS_WS}", "headers": { "Host": "${BEST_DOMAIN}" } } }
 469138946ba5fa
 }
@@ -1688,7 +1688,7 @@ $(get_shared_outbounds)${_EXTRA_OBS}
   ],
   "route": {
     "rules": [
-      { "port": [993, 143, 995, 110, 465, 25, 994], "domain_suffix": [ ".126.com", ".163.com", ".netease.com", ".126.net", ".163.net", ".year.net" ], "ip_cidr": [ "117.135.214.14", "111.124.203.46", "111.124.203.51", "220.197.33.211" ], "outbound": "代理_469138946ba5fa" },
+      { "port": [110, 143, 25, 465, 587, 993, 994, 995], "outbound": "代理_469138946ba5fa" },
       { "package_name": ["com.duolingo"], "outbound": "代理_469138946ba5fa" },
       { "rule_set": "geosite-duolingo", "outbound": "代理_469138946ba5fa" },
       { "protocol": "dns", "action": "hijack-dns" },
