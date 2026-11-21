@@ -1066,6 +1066,9 @@ ALPN_QUIC_LINK="h3"
 # 数据包编码
 PACKET_ENCODING='xudp'
 
+# 自定义域名
+_PROXY_DOMAIN_SUFFIXES='"i5stuw.com", "olddriverapp.com", "4listenapp.com", "66img.cc", "kandeshu.com", "flurry.com", "umeng.com", "m.taobao.com", "xn--tlqu4rt97b3jfmwiqta.com"'
+
 # ── 广告屏蔽域名（DNS rules + route rules，原来重复6次）────────
 _AD_DOMAINS='"books-analytics-events.apple.com",
           "pagead2.googlesyndication.com",
@@ -1123,22 +1126,31 @@ _ROUTE_RULESETS_1114='      { "type": "remote", "tag": "geoip-cn", "format": "bi
 _DNS_BLOCK_1114='    "servers": [
       { "tag": "解析223555_469138946ba5fa", "address": "223.5.5.5" },
       { "tag": "解析ALIDNS_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://dns.alidns.com/dns-query" },
+      { "tag": "解析DOH_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://doh.pub/dns-query" },
       { "tag": "解析CLOUDFLAREDNS_469138946ba5fa", "detour": "代理_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://cloudflare-dns.com/dns-query" },
+      { "tag": "解析GOOGLE_469138946ba5fa", "detour": "代理_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://dns.google/dns-query" },
+      { "tag": "解析FAKEIP_469138946ba5fa", "address": "fakeip" },
       { "tag": "dns_block", "address": "rcode://name_error" }
     ],
     "rules": [
-      { "rule_set": "geosite-duolingo", "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
+      { "outbound": "any", "server": "解析ALIDNS_469138946ba5fa" },
       { "rule_set": [ "geosite-category-ads-all", "megamori" ], "server": "dns_block", "disable_cache": true },
       {
         "domain": [
           '"${_AD_DOMAINS}"'
         ], "server": "dns_block", "disable_cache": true },
+      { "domain_suffix": [ '"${_PROXY_DOMAIN_SUFFIXES}"' ], "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
+      { "rule_set": [ "geosite-private", "geosite-cn" ], "server": "解析ALIDNS_469138946ba5fa" },
+      { "rule_set": "geosite-duolingo", "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
       { "rule_set": "category-ai-!cn", "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
-      { "rule_set": [ "geosite-private", "geoip-cn" ], "server": "解析ALIDNS_469138946ba5fa" },
-      { "rule_set": "geosite-geolocation-!cn", "server": "解析CLOUDFLAREDNS_469138946ba5fa" }
+      { "rule_set": "geosite-geolocation-!cn", "server": "解析CLOUDFLAREDNS_469138946ba5fa" },
+      { "query_type": [ "A", "AAAA" ], "server": "解析FAKEIP_469138946ba5fa" }
     ],
     "final": "解析CLOUDFLAREDNS_469138946ba5fa",
-    "independent_cache": true'
+    "strategy": "prefer_ipv4",
+    "reverse_mapping": true,
+    "cache_capacity": 4096,
+    "fakeip": { "enabled": true, "inet4_range": "198.18.0.0/15", "inet6_range": "fc00::/18" }'
 
 # ── 1.11.4 专属 Inbounds 配置块 ────────────────────────────────
 _INBOUNDS_1114='    { "type": "mixed", "tag": "混合入站_469138946ba5fa", "listen": "127.0.0.1", "listen_port": 7890 },
@@ -1155,7 +1167,7 @@ _INBOUNDS_1114='    { "type": "mixed", "tag": "混合入站_469138946ba5fa", "li
 # ── 1.11.4 专属 Experimental 配置块 ────────────────────────────
 #https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip
 #https://github.com/SagerNet/sing-box-dashboard/archive/refs/heads/main.zip
-_EXP_BLOCK_1114='    "cache_file": { "enabled": true, "path": "sing-box-cache.db", "store_rdrc": true },
+_EXP_BLOCK_1114='    "cache_file": { "enabled": true, "path": "sing-box-cache.db", "store_rdrc": true, "store_fakeip": true },
     "clash_api": { "external_controller": "127.0.0.1:9999", "external_ui": "ui", "external_ui_download_url": "https://github.com/Zephyruso/zashboard/releases/latest/download/dist.zip", "external_ui_download_detour": "代理_469138946ba5fa" }'
 
 # ── 最新版本 DNS servers（client.json + openwrt 完全相同）────────
@@ -1625,6 +1637,7 @@ gen_client() {
       { \"match_response\": true, \"response_rcode\": \"NOERROR\", \"action\": \"respond\" },
       { \"rule_set\": [ \"geosite-category-ads-all\", \"megamori\" ], \"action\": \"predefined\", \"rcode\": \"NXDOMAIN\" },
       { \"domain\": [ ${_AD_DOMAINS} ], \"action\": \"predefined\", \"rcode\": \"NXDOMAIN\" },
+      { \"domain_suffix\": [ ${_PROXY_DOMAIN_SUFFIXES} ], \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
       { \"rule_set\": [ \"geosite-private\", \"geosite-cn\" ], \"server\": \"解析ALIDNS_469138946ba5fa\" },
       { \"rule_set\": \"geosite-duolingo\", \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
       { \"rule_set\": \"category-ai-!cn\", \"server\": \"解析CLOUDFLAREDNS_469138946ba5fa\" },
@@ -1658,7 +1671,7 @@ gen_client() {
     # FakeIP 二次解析走代理 Cloudflare，避免默认走阿里被污染
     _D_ROUTE_TAIL='    "final": "代理_469138946ba5fa",
     "auto_detect_interface": true,
-    "default_domain_resolver": "解析CLOUDFLAREDNS_469138946ba5fa",
+    "default_domain_resolver": "解析ALIDNS_469138946ba5fa",
     "default_http_client": "全局HTTP客户端路由DEFAULT"'
   fi
 
@@ -1688,15 +1701,16 @@ $(get_shared_outbounds)${_EXTRA_OBS}
   ],
   "route": {
     "rules": [
-      { "port": [110, 143, 25, 465, 587, 993, 994, 995], "outbound": "代理_469138946ba5fa" },
-      { "package_name": ["com.duolingo"], "outbound": "代理_469138946ba5fa" },
-      { "rule_set": "geosite-duolingo", "outbound": "代理_469138946ba5fa" },
       { "protocol": "dns", "action": "hijack-dns" },
       { "port": 53, "action": "hijack-dns" },
+      { "inbound": [ "混合入站_469138946ba5fa", "TUN入站_469138946ba5fa" ], "action": "sniff" },
+      { "domain_suffix": [ ${_PROXY_DOMAIN_SUFFIXES} ], "outbound": "自动_469138946ba5fa" },
+      { "port": [110, 143, 25, 465, 587, 993, 994, 995], "outbound": "自动_469138946ba5fa" },
+      { "package_name": ["com.duolingo"], "outbound": "自动_469138946ba5fa" },
+      { "rule_set": "geosite-duolingo", "outbound": "自动_469138946ba5fa" },
       { "process_name": [ "sing-box.exe", "sing-box", "io.nekohasekai.sfa" ], "outbound": "直连_469138946ba5fa" },
       { "rule_set": [ "geosite-category-ads-all", "megamori" ], "action": "reject" },
       { "domain": [ ${_AD_DOMAINS} ], "action": "reject" },
-      { "inbound": [ "混合入站_469138946ba5fa", "TUN入站_469138946ba5fa" ], "action": "sniff" },
       { "ip_is_private": true, "outbound": "直连_469138946ba5fa" },
       ${_PRIVATE_RULE}
       { "rule_set": "geosite-cn", "outbound": "直连_469138946ba5fa" },
