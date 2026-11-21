@@ -1124,9 +1124,9 @@ _ROUTE_RULESETS_1114='      { "type": "remote", "tag": "geoip-cn", "format": "bi
 
 # ── 1.11.4 专属 DNS 配置块 ─────────────────────────────────────
 _DNS_BLOCK_1114='    "servers": [
-      { "tag": "解析223555_469138946ba5fa", "address": "223.5.5.5" },
-      { "tag": "解析ALIDNS_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://dns.alidns.com/dns-query" },
-      { "tag": "解析DOH_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://doh.pub/dns-query" },
+      { "tag": "解析223555_469138946ba5fa", "detour": "直连_469138946ba5fa", "address": "223.5.5.5" },
+      { "tag": "解析ALIDNS_469138946ba5fa", "detour": "直连_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://dns.alidns.com/dns-query" },
+      { "tag": "解析DOH_469138946ba5fa", "detour": "直连_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://doh.pub/dns-query" },
       { "tag": "解析CLOUDFLAREDNS_469138946ba5fa", "detour": "代理_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://cloudflare-dns.com/dns-query" },
       { "tag": "解析GOOGLE_469138946ba5fa", "detour": "代理_469138946ba5fa", "address_resolver": "解析223555_469138946ba5fa", "address": "https://dns.google/dns-query" },
       { "tag": "解析FAKEIP_469138946ba5fa", "address": "fakeip" },
@@ -1156,6 +1156,7 @@ _DNS_BLOCK_1114='    "servers": [
 _INBOUNDS_1114='    { "type": "mixed", "tag": "混合入站_469138946ba5fa", "listen": "127.0.0.1", "listen_port": 7890 },
     {
       "type": "tun",
+      "stack": "system",
       "tag": "TUN入站_469138946ba5fa",
       "endpoint_independent_nat": true,
       "address": [ "172.19.0.1/28", "fdfe:dcba:9876::1/126" ],
@@ -1672,7 +1673,7 @@ gen_client() {
     _D_ROUTE_TAIL='    "final": "代理_469138946ba5fa",
     "auto_detect_interface": true,
     "default_domain_resolver": "解析ALIDNS_469138946ba5fa",
-    "default_http_client": "全局HTTP客户端路由DEFAULT"'
+    "default_http_client": "全局HTTP客户端路由代理"'
   fi
 
 #    { "type": "urltest", "tag": "自动_469138946ba5fa", "outbounds": [ "${OUTBOUND_VLESS}", "${OUTBOUND_TROJAN}", ${_ANYTLS_REF}"${OUTBOUND_VMESS_REALITY}", "${OUTBOUND_VMESS_WS}", "${OUTBOUND_VMESS_WS_TLS}"${_EXTRA_CF_TAGS} ], "url": "http://cp.cloudflare.com/generate_204", "interval": "10m0s", "tolerance": 100 },
