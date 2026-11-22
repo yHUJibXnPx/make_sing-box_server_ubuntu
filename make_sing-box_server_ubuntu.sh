@@ -365,11 +365,13 @@ downloadAndBuild() {
       set -e
       VERSION=""
       if [ $rc -eq 0 ] && [ -n "$RELEASE_JSON" ]; then
-        if [ "$SING_BOX_CHANNEL" = "stable" ]; then
-          VERSION=$(printf '%s' "$RELEASE_JSON" | jq -r '[.[] | select(.draft == false and .prerelease == false) | .tag_name][0] // empty')
-        else
-          VERSION=$(printf '%s' "$RELEASE_JSON" | jq -r '[.[] | select(.draft == false) | .tag_name][0] // empty')
-        fi
+        VERSION=$(printf '%s' "$RELEASE_JSON" | SING_BOX_CHANNEL="$SING_BOX_CHANNEL" python3 -c '
+import json, os, sys
+data = json.load(sys.stdin)
+ch = os.environ.get("SING_BOX_CHANNEL", "testing")
+tags = [r["tag_name"] for r in data if not r.get("draft") and (ch != "stable" or not r.get("prerelease"))]
+print(tags[0] if tags else "")
+')
       fi
     fi
 
@@ -421,31 +423,31 @@ downloadAndBuild() {
         *) echo "不支持"; exit 1 ;;
       esac
       ;;
-    jq)
-      case ${MACHINE_OS} in
-        linux)
-          # 适配 jq 的 release 命名规范
-          FULL_URL="${GITHUB_URI}/releases/download/${VERSION}/jq-${MACHINE_OS}-${MACHINE_ARCH}"
-          rm -fv "${WORKDIR}/${FILENAME}"
-          curl -L -C - --retry 3 --retry-delay 5 --progress-bar -o "${WORKDIR}/${FILENAME}" "${FULL_URL}"
-          chmod -v +x "${WORKDIR}/${FILENAME}"
-          ;;
-        *) echo "不支持"; exit 1 ;;
-      esac
-      ;;
+    #jq)
+    #  case ${MACHINE_OS} in
+    #    linux)
+    #      # 适配 jq 的 release 命名规范
+    #      FULL_URL="${GITHUB_URI}/releases/download/${VERSION}/jq-${MACHINE_OS}-${MACHINE_ARCH}"
+    #      rm -fv "${WORKDIR}/${FILENAME}"
+    #      curl -L -C - --retry 3 --retry-delay 5 --progress-bar -o "${WORKDIR}/${FILENAME}" "${FULL_URL}"
+    #      chmod -v +x "${WORKDIR}/${FILENAME}"
+    #      ;;
+    #    *) echo "不支持"; exit 1 ;;
+    #  esac
+    #  ;;
   esac
 }
 
 downloadFile() {
-  echo "正在安装 jq..."
-  if command -v jq >/dev/null 2>&1; then
-    echo "jq 已存在，跳过安装"
-  elif [ -f "${WORKDIR}/jq" ]; then
-    echo "jq 二进制文件已存在于 ${WORKDIR}/jq"
-  else
-    echo "正在下载 jq (二进制模式)..."
-    downloadAndBuild "jqlang/jq"
-  fi
+  #echo "正在安装 jq..."
+  #if command -v jq >/dev/null 2>&1; then
+  #  echo "jq 已存在，跳过安装"
+  #elif [ -f "${WORKDIR}/jq" ]; then
+  #  echo "jq 二进制文件已存在于 ${WORKDIR}/jq"
+  #else
+  #  echo "正在下载 jq (二进制模式)..."
+  #  downloadAndBuild "jqlang/jq"
+  #fi
   downloadAndBuild "SagerNet/sing-box"
   downloadAndBuild "cloudflare/cloudflared"
 }
@@ -453,8 +455,11 @@ downloadFile() {
 # 第一优先级：先搞定网络下载工具 curl
 ensure_curl
 
+command -v python3 >/dev/null 2>&1 || { echo "✘ 未检测到 python3，请先安装（apt update && apt install -y python3）" >&2; exit 1; }
+
 # 检查环境
-if [ -d "${WORKDIR}/sing-boxs" ] && [ -f "${WORKDIR}/cloudflared" ] && ( command -v curl >/dev/null 2>&1 ) && ( command -v jq >/dev/null 2>&1 || [ -f "${WORKDIR}/jq" ] ); then
+#if [ -d "${WORKDIR}/sing-boxs" ] && [ -f "${WORKDIR}/cloudflared" ] && ( command -v curl >/dev/null 2>&1 ) && ( command -v jq >/dev/null 2>&1 || [ -f "${WORKDIR}/jq" ] ); then
+if [ -d "${WORKDIR}/sing-boxs" ] && [ -f "${WORKDIR}/cloudflared" ] && ( command -v curl >/dev/null 2>&1 ); then
   echo '无需下载，已经存在'
 else
   downloadFile
@@ -851,11 +856,7 @@ SHORT_IDS_ANYTLS=$(gen_many_short_ids)
 SHORT_IDS_VMESS_REALITY=$(gen_many_short_ids)
 
 pick_random_short_id() {
-  json_str=$1
-  len=$(echo "$json_str" | jq 'length')
-  rand_val=$(get_true_random)
-  idx=$((rand_val % len))
-  echo "$json_str" | jq -r ".[$idx]"
+  python3 -c 'import json,secrets,sys; print(secrets.choice(json.loads(sys.argv[1])))' "$1"
 }
 
 SHORT_ID_VLESS=$(pick_random_short_id "$SHORT_IDS_VLESS")
@@ -1030,7 +1031,7 @@ PAD_10="9=$(ensure_min_max $((R_HIGH_BASE+300)) $((R_HIGH_BASE+600))),c,$(ensure
 PAD_11="10=12-12,$(ensure_min_max $((R_HIGH_BASE+400)) $((R_HIGH_BASE+800)))"
 PAD_12="11=50-150,c,$(ensure_min_max $((R2_BASE+100)) $((R2_BASE+400))),c,700-1100"
 
-PADDING_SCHEME_JSON=$(jq -n --argjson pads "[\"$PAD_0\",\"$PAD_1\",\"$PAD_2\",\"$PAD_3\",\"$PAD_4\",\"$PAD_5\",\"$PAD_6\",\"$PAD_7\",\"$PAD_8\",\"$PAD_9\",\"$PAD_10\",\"$PAD_11\",\"$PAD_12\"]" '$pads | .[:12]')
+PADDING_SCHEME_JSON=$(python3 -c 'import json,sys; print(json.dumps(sys.argv[1:13]))' "$PAD_0" "$PAD_1" "$PAD_2" "$PAD_3" "$PAD_4" "$PAD_5" "$PAD_6" "$PAD_7" "$PAD_8" "$PAD_9" "$PAD_10" "$PAD_11" "$PAD_12")
 
 echo $PADDING_SCHEME_JSON
 
@@ -1797,234 +1798,180 @@ printf "%s\n" "${SUBSCRIPTION_BASE64}"  > "${WORKDIR}/subscription_base64.txt"
 check_subscription_consistency() {
   local cfg="${WORKDIR}/client.json"
   local sub="${WORKDIR}/subscription.txt"
-  local errors=0
-  local warnings=0
 
   if [ ! -s "$cfg" ] || [ ! -s "$sub" ]; then
     echo "⚠ 一致性检查跳过：client.json 或 subscription.txt 不存在"
     return 0
   fi
 
-  local uri_get_param
-  uri_get_param() {
-    local uri="$1" key="$2"
-    printf '%s\n' "$uri" | sed -n "s#.*[?&]${key}=\([^&#]*\).*#\1#p"
-  }
+  python3 - "$cfg" "$sub" << 'PY469138946ba5fa'
+import base64, json, sys, urllib.parse
 
-  local uri_fragment
-  uri_fragment() {
-    local uri="$1"
-    printf '%s\n' "$uri" | sed 's/.*#//'
-  }
+cfg_path, sub_path = sys.argv[1], sys.argv[2]
+errors = 0
+warnings = 0
 
-  local b64_decode
-  b64_decode() {
-    printf '%s' "$1" | base64 -d 2>/dev/null || true
-  }
+print("====================================")
+print("  订阅 URI ↔ client.json 一致性检查")
+print("====================================")
 
-  local bool_to_link
-  bool_to_link() {
-    case "$1" in
-      true) printf '1' ;;
-      false) printf '0' ;;
-      *) printf '%s' "$1" ;;
-    esac
-  }
+try:
+    with open(cfg_path, "r", encoding="utf-8") as f:
+        cfg = json.load(f)
+except Exception:
+    print("  [ERROR] client.json 不是有效 JSON")
+    print("====================================")
+    sys.exit(0)
 
-  local json_field
-  json_field() {
-    local obj="$1" filter="$2"
-    jq -r "($filter) | if . == null then \"\" else tostring end" <<<"$obj" 2>/dev/null
-  }
+with open(sub_path, "r", encoding="utf-8") as f:
+    sub_lines = [line.strip() for line in f if line.strip()]
 
-  local find_uri_for_tag
-  find_uri_for_tag() {
-    local tag="$1" line decoded fragment
-    while IFS= read -r line; do
-      [ -z "$line" ] && continue
-      case "$line" in
-        vmess://*)
-          decoded=$(b64_decode "${line#vmess://}")
-          if [ -n "$decoded" ] && [ "$(jq -r '.ps // empty' <<<"$decoded" 2>/dev/null)" = "$tag" ]; then
-            printf '%s\n' "$line"
-            return 0
-          fi
-          ;;
-        *)
-          fragment=$(uri_fragment "$line")
-          if [ "$fragment" = "$tag" ]; then
-            printf '%s\n' "$line"
-            return 0
-          fi
-          ;;
-      esac
-    done < "$sub"
-    return 1
-  }
+uri_by_tag = {}
+for line in sub_lines:
+    if line.startswith("vmess://"):
+        try:
+            raw = base64.b64decode(line[len("vmess://"):]).decode("utf-8")
+            vm = json.loads(raw)
+            if vm.get("ps"):
+                uri_by_tag[vm["ps"]] = (line, vm)
+        except Exception:
+            pass
+    elif "#" in line:
+        tag = urllib.parse.unquote(line.split("#", 1)[1])
+        uri_by_tag[tag] = (line, None)
 
-  check_eq() {
-    local name="$1" actual="$2" expected="$3"
-    if [ "$actual" = "$expected" ]; then
-      echo "  [OK] ${name}: ${actual}"
-    else
-      echo "  [ERROR] ${name}: client=${actual:-<空>} uri=${expected:-<空>}"
-      errors=$((errors+1))
-    fi
-  }
+def b2l(v):
+    if v is True: return "1"
+    if v is False: return "0"
+    return "" if v is None else str(v)
 
-  check_optional_eq() {
-    local name="$1" actual="$2" expected="$3"
-    if [ -z "$actual" ] && [ -z "$expected" ]; then
-      return 0
-    fi
-    check_eq "$name" "$actual" "$expected"
-  }
+def check_eq(name, actual, expected):
+    global errors
+    a = "" if actual is None else str(actual)
+    e = "" if expected is None else str(expected)
+    if a == e:
+        print(f"  [OK] {name}: {a}")
+    else:
+        print(f"  [ERROR] {name}: client={a or '<空>'} uri={e or '<空>'}")
+        errors += 1
 
-  echo "===================================="
-  echo "  订阅 URI ↔ client.json 一致性检查"
-  echo "===================================="
+def check_opt(name, actual, expected):
+    a = "" if actual is None else str(actual)
+    e = "" if expected is None else str(expected)
+    if not a and not e:
+        return
+    check_eq(name, a, e)
 
-  # 先确认 client.json 本身能被 jq 完整解析。
-  if ! jq -e . "$cfg" >/dev/null 2>&1; then
-    echo "  [ERROR] client.json 不是有效 JSON"
-    echo "===================================="
-    return 0
-  fi
-
-  # ── Hysteria2 / TUIC / VLESS / Trojan / AnyTLS / VMess ───────────────
-  local obj tag type uri
-  while IFS= read -r obj; do
-    [ -z "$obj" ] && continue
-    tag=$(json_field "$obj" '.tag')
-    type=$(json_field "$obj" '.type')
-    [ -z "$tag" ] && continue
-
-    case "$type" in
-      hysteria2|tuic|vless|trojan|anytls|vmess)
-        uri=$(find_uri_for_tag "$tag" || true)
-        if [ -z "$uri" ]; then
-          echo "  [ERROR] ${type} ${tag}: subscription.txt 未找到对应 URI"
-          errors=$((errors+1))
-          continue
-        fi
-        ;;
-      *)
+for ob in cfg.get("outbounds", []):
+    if not isinstance(ob, dict) or not ob.get("server"):
         continue
-        ;;
-    esac
+    tag = ob.get("tag", "")
+    typ = ob.get("type", "")
+    if typ not in ("hysteria2", "tuic", "vless", "trojan", "anytls", "vmess") or not tag:
+        continue
+    if tag not in uri_by_tag:
+        print(f"  [ERROR] {typ} {tag}: subscription.txt 未找到对应 URI")
+        errors += 1
+        continue
 
-    echo "  ├─ ${type}: ${tag}"
+    uri, vm = uri_by_tag[tag]
+    print(f"  ├─ {typ}: {tag}")
+    parsed = urllib.parse.urlparse(uri)
+    qs = {k: v[0] for k, v in urllib.parse.parse_qs(parsed.query, keep_blank_values=True).items()}
+    tls = ob.get("tls") or {}
+    reality = tls.get("reality") or {}
+    tr = ob.get("transport") or {}
 
-    case "$type" in
-      hysteria2)
-        check_eq "    server" "$(json_field "$obj" '.server')" "$(printf '%s\n' "$uri" | sed -n 's#^[^@]*@\([^:]*\):.*#\1#p')"
-        check_eq "    port" "$(json_field "$obj" '.server_port')" "$(printf '%s\n' "$uri" | sed -n 's#^[^@]*@[^:]*:\([^?]*\).*#\1#p')"
-        check_eq "    password" "$(json_field "$obj" '.password')" "$(printf '%s\n' "$uri" | sed -n 's#^hysteria2://\([^@]*\)@.*#\1#p')"
-        check_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(uri_get_param "$uri" 'sni')"
-        check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(uri_get_param "$uri" 'insecure')"
-        check_eq "    ALPN" "$(json_field "$obj" '.tls.alpn[0]')" "$(uri_get_param "$uri" 'alpn')"
-        check_optional_eq "    obfs.type" "$(json_field "$obj" '.obfs.type')" "$(uri_get_param "$uri" 'obfs')"
-        check_optional_eq "    obfs.password" "$(json_field "$obj" '.obfs.password')" "$(uri_get_param "$uri" 'obfs-password')"
-        if jq -e '.tls.certificate != null' <<<"$obj" >/dev/null 2>&1; then
-          echo "  [INFO]     certificate: JSON-only（URI 无需携带）"
-          warnings=$((warnings+1))
-        fi
-        ;;
+    if typ == "hysteria2":
+        check_eq("    server", ob.get("server"), parsed.hostname)
+        check_eq("    port", ob.get("server_port"), parsed.port)
+        check_eq("    password", ob.get("password"), urllib.parse.unquote(parsed.username or ""))
+        check_eq("    SNI", tls.get("server_name"), qs.get("sni", ""))
+        check_eq("    insecure", b2l(tls.get("insecure")), qs.get("insecure", ""))
+        check_eq("    ALPN", (tls.get("alpn") or [""])[0], qs.get("alpn", ""))
+        obfs = ob.get("obfs") or {}
+        check_opt("    obfs.type", obfs.get("type"), qs.get("obfs", ""))
+        check_opt("    obfs.password", obfs.get("password"), qs.get("obfs-password", ""))
+        if tls.get("certificate") is not None:
+            print("  [INFO]     certificate: JSON-only（URI 无需携带）")
+            warnings += 1
+    elif typ == "tuic":
+        check_eq("    server", ob.get("server"), parsed.hostname)
+        check_eq("    port", ob.get("server_port"), parsed.port)
+        check_eq("    UUID", ob.get("uuid"), urllib.parse.unquote(parsed.username or ""))
+        check_eq("    password", ob.get("password"), urllib.parse.unquote(parsed.password or ""))
+        check_eq("    SNI", tls.get("server_name"), qs.get("sni", ""))
+        check_eq("    insecure", b2l(tls.get("insecure")), qs.get("insecure", ""))
+        check_eq("    ALPN", (tls.get("alpn") or [""])[0], qs.get("alpn", ""))
+        check_eq("    congestion_control", ob.get("congestion_control", ""), qs.get("congestion_control", ""))
+        check_eq("    version", ob.get("version", 5), qs.get("version", ""))
+        check_eq("    udp_relay_mode", ob.get("udp_relay_mode", "native"), qs.get("udp_relay_mode", ""))
+        if tls.get("certificate") is not None:
+            print("  [INFO]     certificate: JSON-only（URI 无需携带）")
+            warnings += 1
+    elif typ == "vless":
+        check_eq("    server", ob.get("server"), parsed.hostname)
+        check_eq("    port", ob.get("server_port"), parsed.port)
+        check_eq("    UUID", ob.get("uuid"), urllib.parse.unquote(parsed.username or ""))
+        check_opt("    flow", ob.get("flow"), qs.get("flow", ""))
+        check_opt("    SNI", tls.get("server_name"), qs.get("sni", ""))
+        if reality.get("enabled") is True:
+            check_eq("    security", "reality", qs.get("security", ""))
+            check_eq("    insecure", b2l(tls.get("insecure")), qs.get("insecure", ""))
+            check_eq("    fingerprint", (tls.get("utls") or {}).get("fingerprint"), qs.get("fp", ""))
+            check_eq("    public_key", reality.get("public_key"), qs.get("pbk", ""))
+            check_eq("    short_id", reality.get("short_id"), qs.get("sid", ""))
+            check_eq("    type", "tcp", qs.get("type", ""))
+        else:
+            check_eq("    type", "ws", qs.get("type", ""))
+            check_opt("    host", (tr.get("headers") or {}).get("Host"), qs.get("host", ""))
+            check_opt("    path", tr.get("path"), qs.get("path", ""))
+            if tls.get("enabled") is True:
+                check_eq("    security", "tls", qs.get("security", ""))
+                check_eq("    insecure", b2l(tls.get("insecure")), qs.get("allowInsecure", ""))
+                check_eq("    SNI", tls.get("server_name"), qs.get("sni", ""))
+                check_opt("    ALPN", (tls.get("alpn") or [""])[0], qs.get("alpn", ""))
+                check_opt("    fingerprint", (tls.get("utls") or {}).get("fingerprint"), qs.get("fp", ""))
+            else:
+                check_opt("    security", "none", qs.get("security", ""))
+    elif typ in ("trojan", "anytls"):
+        check_eq("    server", ob.get("server"), parsed.hostname)
+        check_eq("    port", ob.get("server_port"), parsed.port)
+        check_eq("    password", ob.get("password"), urllib.parse.unquote(parsed.username or ""))
+        check_eq("    security", "reality", qs.get("security", ""))
+        check_eq("    SNI", tls.get("server_name"), qs.get("sni", ""))
+        check_eq("    insecure", b2l(tls.get("insecure")), qs.get("insecure", ""))
+        check_eq("    fingerprint", (tls.get("utls") or {}).get("fingerprint"), qs.get("fp", ""))
+        check_eq("    public_key", reality.get("public_key"), qs.get("pbk", ""))
+        check_eq("    short_id", reality.get("short_id"), qs.get("sid", ""))
+    elif typ == "vmess" and vm is not None:
+        check_eq("    server", ob.get("server"), vm.get("add", ""))
+        check_eq("    port", ob.get("server_port"), vm.get("port", ""))
+        check_eq("    UUID", ob.get("uuid"), vm.get("id", ""))
+        if reality.get("enabled") is True:
+            check_eq("    TLS", "reality", vm.get("tls", ""))
+            check_eq("    SNI", tls.get("server_name"), vm.get("sni", ""))
+            check_eq("    insecure", b2l(tls.get("insecure")), vm.get("allowInsecure", ""))
+            check_eq("    fingerprint", (tls.get("utls") or {}).get("fingerprint"), vm.get("fp", ""))
+            check_eq("    public_key", reality.get("public_key"), vm.get("pbk", ""))
+            check_eq("    short_id", reality.get("short_id"), vm.get("sid", ""))
+        elif tls.get("enabled") is True:
+            check_eq("    TLS", "true", "true" if vm.get("tls") == "tls" else "false")
+            check_opt("    network", tr.get("type"), vm.get("net", ""))
+            check_eq("    SNI", tls.get("server_name"), vm.get("sni", ""))
+            check_eq("    insecure", b2l(tls.get("insecure")), vm.get("allowInsecure", ""))
+            check_opt("    ALPN", (tls.get("alpn") or [""])[0], vm.get("alpn", ""))
+            check_opt("    path", tr.get("path"), vm.get("path", ""))
+            check_opt("    host", (tr.get("headers") or {}).get("Host"), vm.get("host", ""))
 
-      tuic)
-        check_eq "    server" "$(json_field "$obj" '.server')" "$(printf '%s\n' "$uri" | sed -n 's#^[^@]*@\([^:]*\):.*#\1#p')"
-        check_eq "    port" "$(json_field "$obj" '.server_port')" "$(printf '%s\n' "$uri" | sed -n 's#^[^@]*@[^:]*:\([^?]*\).*#\1#p')"
-        check_eq "    UUID" "$(json_field "$obj" '.uuid')" "$(printf '%s\n' "$uri" | sed -n 's#^tuic://\([^:]*\):.*#\1#p')"
-        check_eq "    password" "$(json_field "$obj" '.password')" "$(printf '%s\n' "$uri" | sed -n 's#^tuic://[^:]*:\([^@]*\)@.*#\1#p')"
-        check_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(uri_get_param "$uri" 'sni')"
-        check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(uri_get_param "$uri" 'insecure')"
-        check_eq "    ALPN" "$(json_field "$obj" '.tls.alpn[0]')" "$(uri_get_param "$uri" 'alpn')"
-        check_eq "    congestion_control" "$(json_field "$obj" '.congestion_control // ""')" "$(uri_get_param "$uri" 'congestion_control')"
-        check_eq "    version" "$(json_field "$obj" '.version // 5')" "$(uri_get_param "$uri" 'version')"
-        check_eq "    udp_relay_mode" "$(json_field "$obj" '.udp_relay_mode // "native"')" "$(uri_get_param "$uri" 'udp_relay_mode')"
-        if jq -e '.tls.certificate != null' <<<"$obj" >/dev/null 2>&1; then
-          echo "  [INFO]     certificate: JSON-only（URI 无需携带）"
-          warnings=$((warnings+1))
-        fi
-        ;;
-
-      vless)
-        check_eq "    server" "$(json_field "$obj" '.server')" "$(printf '%s\n' "$uri" | sed -n 's#^vless://[^@]*@\([^:]*\):.*#\1#p')"
-        check_eq "    port" "$(json_field "$obj" '.server_port')" "$(printf '%s\n' "$uri" | sed -n 's#^vless://[^@]*@[^:]*:\([^?]*\).*#\1#p')"
-        check_eq "    UUID" "$(json_field "$obj" '.uuid')" "$(printf '%s\n' "$uri" | sed -n 's#^vless://\([^@]*\)@.*#\1#p')"
-        check_optional_eq "    flow" "$(json_field "$obj" '.flow')" "$(uri_get_param "$uri" 'flow')"
-        check_optional_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(uri_get_param "$uri" 'sni')"
-        if jq -e '.tls != null and .tls.reality != null and .tls.reality.enabled == true' <<<"$obj" >/dev/null 2>&1; then
-          check_eq "    security" "reality" "$(uri_get_param "$uri" 'security')"
-          check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(uri_get_param "$uri" 'insecure')"
-          check_eq "    fingerprint" "$(json_field "$obj" '.tls.utls.fingerprint')" "$(uri_get_param "$uri" 'fp')"
-          check_eq "    public_key" "$(json_field "$obj" '.tls.reality.public_key')" "$(uri_get_param "$uri" 'pbk')"
-          check_eq "    short_id" "$(json_field "$obj" '.tls.reality.short_id')" "$(uri_get_param "$uri" 'sid')"
-          check_eq "    type" "tcp" "$(uri_get_param "$uri" 'type')"
-        else
-          check_eq "    type" "ws" "$(uri_get_param "$uri" 'type')"
-          check_optional_eq "    host" "$(json_field "$obj" '.transport.headers.Host')" "$(uri_get_param "$uri" 'host')"
-          check_optional_eq "    path" "$(json_field "$obj" '.transport.path')" "$(uri_get_param "$uri" 'path')"
-          if jq -e '.tls != null and .tls.enabled == true' <<<"$obj" >/dev/null 2>&1; then
-            check_eq "    security" "tls" "$(uri_get_param "$uri" 'security')"
-            check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(uri_get_param "$uri" 'allowInsecure')"
-            check_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(uri_get_param "$uri" 'sni')"
-            check_optional_eq "    ALPN" "$(json_field "$obj" '.tls.alpn[0]')" "$(uri_get_param "$uri" 'alpn')"
-            check_optional_eq "    fingerprint" "$(json_field "$obj" '.tls.utls.fingerprint')" "$(uri_get_param "$uri" 'fp')"
-          else
-            check_optional_eq "    security" "none" "$(uri_get_param "$uri" 'security')"
-          fi
-        fi
-        ;;
-
-      trojan|anytls)
-        check_eq "    server" "$(json_field "$obj" '.server')" "$(printf '%s\n' "$uri" | sed -n "s#^${type}://[^@]*@\([^:]*\):.*#\1#p")"
-        check_eq "    port" "$(json_field "$obj" '.server_port')" "$(printf '%s\n' "$uri" | sed -n "s#^${type}://[^@]*@[^:]*:\([^?]*\).*#\1#p")"
-        check_eq "    password" "$(json_field "$obj" '.password')" "$(printf '%s\n' "$uri" | sed -n "s#^${type}://\([^@]*\)@.*#\1#p")"
-        check_eq "    security" "reality" "$(uri_get_param "$uri" 'security')"
-        check_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(uri_get_param "$uri" 'sni')"
-        check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(uri_get_param "$uri" 'insecure')"
-        check_eq "    fingerprint" "$(json_field "$obj" '.tls.utls.fingerprint')" "$(uri_get_param "$uri" 'fp')"
-        check_eq "    public_key" "$(json_field "$obj" '.tls.reality.public_key')" "$(uri_get_param "$uri" 'pbk')"
-        check_eq "    short_id" "$(json_field "$obj" '.tls.reality.short_id')" "$(uri_get_param "$uri" 'sid')"
-        ;;
-
-      vmess)
-        # VMess 分享 URI 使用 Base64 JSON；按 ps 已经在 find_uri_for_tag() 对上节点。
-        local vm_decoded
-        vm_decoded=$(b64_decode "${uri#vmess://}")
-        check_eq "    server" "$(json_field "$obj" '.server')" "$(json_field "$vm_decoded" '.add')"
-        check_eq "    port" "$(json_field "$obj" '.server_port')" "$(json_field "$vm_decoded" '.port')"
-        check_eq "    UUID" "$(json_field "$obj" '.uuid')" "$(json_field "$vm_decoded" '.id')"
-        if jq -e '.tls != null and .tls.reality != null and .tls.reality.enabled == true' <<<"$obj" >/dev/null 2>&1; then
-          check_eq "    TLS" "reality" "$(json_field "$vm_decoded" '.tls')"
-          check_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(json_field "$vm_decoded" '.sni')"
-          check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(json_field "$vm_decoded" '.allowInsecure')"
-          check_eq "    fingerprint" "$(json_field "$obj" '.tls.utls.fingerprint')" "$(json_field "$vm_decoded" '.fp')"
-          check_eq "    public_key" "$(json_field "$obj" '.tls.reality.public_key')" "$(json_field "$vm_decoded" '.pbk')"
-          check_eq "    short_id" "$(json_field "$obj" '.tls.reality.short_id')" "$(json_field "$vm_decoded" '.sid')"
-        elif jq -e '.tls != null and .tls.enabled == true' <<<"$obj" >/dev/null 2>&1; then
-          check_eq "    TLS" "true" "$(if [ "$(json_field "$vm_decoded" '.tls')" = "tls" ]; then printf true; else printf false; fi)"
-          check_optional_eq "    network" "$(json_field "$obj" '.transport.type')" "$(json_field "$vm_decoded" '.net')"
-          check_eq "    SNI" "$(json_field "$obj" '.tls.server_name')" "$(json_field "$vm_decoded" '.sni')"
-          check_eq "    insecure" "$(bool_to_link "$(json_field "$obj" '.tls.insecure')")" "$(json_field "$vm_decoded" '.allowInsecure')"
-          check_optional_eq "    ALPN" "$(json_field "$obj" '.tls.alpn[0]')" "$(json_field "$vm_decoded" '.alpn')"
-          check_optional_eq "    path" "$(json_field "$obj" '.transport.path')" "$(json_field "$vm_decoded" '.path')"
-          check_optional_eq "    host" "$(json_field "$obj" '.transport.headers.Host')" "$(json_field "$vm_decoded" '.host')"
-        fi
-        ;;
-    esac
-  done < <(jq -c '.outbounds[] | select(.server != null and .server != "")' "$cfg")
-
-  echo "------------------------------------"
-  if [ "$errors" -eq 0 ]; then
-    echo "✔ 一致性检查通过：全部真实节点没有发现明确的 URI/JSON 参数冲突"
-  else
-    echo "✘ 一致性检查发现 ${errors} 个明确冲突"
-  fi
-  echo "ℹ JSON-only 参数提示 ${warnings} 个；这些不是错误"
-  echo "------------------------------------"
-  return 0
+print("------------------------------------")
+if errors == 0:
+    print("✔ 一致性检查通过：全部真实节点没有发现明确的 URI/JSON 参数冲突")
+else:
+    print(f"✘ 一致性检查发现 {errors} 个明确冲突")
+print(f"ℹ JSON-only 参数提示 {warnings} 个；这些不是错误")
+print("------------------------------------")
+PY469138946ba5fa
 }
 
 check_subscription_consistency
@@ -2159,86 +2106,65 @@ GROUPS_PATTERNS=$(cat <<'469138946ba5fa'
 NODES="${WORKDIR}/.filtered_nodes.json"
 NODES_CONFIG_TMP="${WORKDIR}/.tmp_client.json"
 
-configs=(
-  "${WORKDIR}/client_1.11.4.json"
-  "${WORKDIR}/client.json"
-  "${WORKDIR}/client_openwrt_sing-box.json"
-)
+set +e
+GROUPS_PATTERNS="$GROUPS_PATTERNS" python3 - \
+  "${WORKDIR}/client_1.11.4.json" \
+  "${WORKDIR}/client.json" \
+  "${WORKDIR}/client_openwrt_sing-box.json" << 'PY469138946ba5fa'
+import json, os, re, sys
 
-set +e  # 分类失败不该让已经跑通的安装以非零状态退出
-for NODES_CONFIG in "${configs[@]}"; do
-  if [ ! -f "${NODES_CONFIG}" ]; then
-    echo "  ⚠ 跳过：${NODES_CONFIG} 不存在"
-    continue
-  fi
+patterns = []
+for line in os.environ.get("GROUPS_PATTERNS", "").splitlines():
+    line = line.strip()
+    if line and "|" in line:
+        patterns.append(line.split("|", 1))
 
-  # 从生成好的 client json 里提取真实协议节点（用是否带 server 字段
-  # 区分"真实节点" vs "selector/urltest 分组壳子"）
-  jq '[.outbounds[] | select(.server != null and .server != "")]' "${NODES_CONFIG}" > "${NODES}" 2>/dev/null
-  if [ $? -ne 0 ] || [ ! -s "${NODES}" ]; then
-    echo "  ⚠ 跳过：${NODES_CONFIG} 节点提取失败（jq 解析出错或结果为空）"
-    continue
-  fi
-  chmod 600 "${NODES}"
+for cfg_path in sys.argv[1:]:
+    if not os.path.isfile(cfg_path):
+        print(f"  ⚠ 跳过：{cfg_path} 不存在")
+        continue
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+    except Exception as e:
+        print(f"  ⚠ 跳过：{cfg_path} 解析失败（{e}）")
+        continue
 
-  # 遍历分组定义，每行格式：tag|pattern
-  # 已匹配过的节点集合（互斥用）
-  matched_all='[]'
-  while IFS='|' read -r tag pattern; do
-    echo "处理分组：$tag"
-  
-    # 只匹配「还没有被任何分组抢走」的节点
-    matched=$(jq --arg pattern "$pattern" --argjson already "$matched_all" '
-      [.[]
-       | select(.tag | test($pattern; "i"))
-       | select(.tag as $t | ($already | index($t) | not))
-       | .tag]
-    ' "${NODES}" 2>/dev/null)
+    all_tags = [
+        ob["tag"] for ob in cfg.get("outbounds", [])
+        if isinstance(ob, dict) and ob.get("server") and ob.get("tag")
+    ]
+    if not all_tags:
+        print(f"  ⚠ 跳过：{cfg_path} 未提取到真实节点")
+        continue
 
-    if [ $? -ne 0 ]; then
-      echo "  ⚠ 正则匹配出错，跳过该分组（检查 pattern 里是否有特殊字符没转义）"
-      continue
-    fi
+    matched_all = set()
+    for tag, pattern in patterns:
+        print(f"处理分组：{tag}")
+        try:
+            rx = re.compile(pattern, re.IGNORECASE)
+        except re.error as e:
+            print(f"  ⚠ 正则匹配出错，跳过该分组: {e}")
+            continue
 
-    # 如果没有匹配结果，跳过
-    if [ "$(echo "$matched" | jq 'length')" -eq 0 ]; then
-      echo "  ➤ 无匹配节点，跳过"
-      continue
-    fi
-  
-    # 把本轮匹配到的节点加入总集合
-    matched_all=$(jq -n --argjson new "$matched" --argjson old "$matched_all" '
-      $old + $new | unique
-    ')
+        matched = [t for t in all_tags if t not in matched_all and rx.search(t)]
+        if not matched:
+            print("  ➤ 无匹配节点，跳过")
+            continue
 
-    exists=$(jq --arg tag "$tag" '.outbounds[] | select(.tag == $tag)' "${NODES_CONFIG}")
+        matched_all.update(matched)
+        target = next((ob for ob in cfg["outbounds"] if ob.get("tag") == tag), None)
+        if target is None:
+            print("  ➤ 分组不存在，创建新 selector")
+            cfg["outbounds"].append({"type": "selector", "tag": tag, "outbounds": matched})
+        elif target.get("type") in ("selector", "urltest"):
+            print("  ➤ 分组已存在，更新节点列表")
+            target["outbounds"] = matched
 
-    if [ -z "$exists" ]; then
-      echo "  ➤ 分组不存在，创建新 selector"
-      jq --arg tag "$tag" --argjson outbounds "$matched" '
-        .outbounds += [{
-          type: "selector",
-          tag: $tag,
-          outbounds: $outbounds
-        }]
-      ' "${NODES_CONFIG}" > "${NODES_CONFIG_TMP}" && mv "${NODES_CONFIG_TMP}" "${NODES_CONFIG}"
-    else
-      echo "  ➤ 分组已存在，更新节点列表"
-      jq --arg tag "$tag" --argjson outbounds "$matched" '
-        .outbounds |= map(
-          if .tag == $tag and (.type == "selector" or .type == "urltest") then
-            . + {outbounds: $outbounds}
-          else
-            .
-          end
-        )
-      ' "${NODES_CONFIG}" > "${NODES_CONFIG_TMP}" && mv "${NODES_CONFIG_TMP}" "${NODES_CONFIG}"
-    fi
-  done <<< "${GROUPS_PATTERNS}"
-
-  chmod 600 "${NODES_CONFIG}"
-done
-rm -f "${NODES}" "${NODES_CONFIG_TMP}"
+    with open(cfg_path, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+    os.chmod(cfg_path, 0o600)
+PY469138946ba5fa
 set -e
 
 echo "cat ${WORKDIR}/client_1.11.4.json"
